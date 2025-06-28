@@ -7,7 +7,6 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::{cors::CorsLayer, services::ServeDir};
@@ -68,14 +67,11 @@ async fn index(
     Query(params): Query<IndexQuery>,
 ) -> Result<Html<String>, (StatusCode, String)> {
     let storage = state.storage.read().await;
-    let mut status = storage.get_system_status();
+    let status = storage.get_system_status();
     let builds = storage.get_latest_builds(10);
     
     let lang = params.lang.as_deref().unwrap_or("zh");
-    status.uptime = status.started_at
-        .map(|started_at| chrono::Utc::now() - started_at)
-        .or_else(|| status.uptime);
-    println!("Current system status: {:?}", status);
+
     let html = create_html_page(&status, &builds, lang);
     Ok(Html(html))
 }
@@ -133,14 +129,14 @@ fn create_html_page(
     let is_chinese = lang == "zh";
     
     // Language strings
-    let (title, subtitle, running_status_label, build_status_label, current_commit_label, uptime_label, 
+    let (title, subtitle, server_info, running_status_label, build_status_label, current_commit_label, uptime_label, 
          build_history_label, refresh_btn_text, auto_refresh_text, no_builds_text, lang_switch_text,
          running_text, stopped_text, building_text, success_text, failed_text, pending_text) = if is_chinese {
-        ("Pumpkin Monitor", "自动化部署监控系统", "运行状态", "构建状态", "当前提交", "运行时长", 
+        ("Pumpkin Monitor", "自动化部署监控系统", "测试用 Minecraft 服务器 - 连接地址: slv4.starlight.cool:3082", "运行状态", "构建状态", "当前提交", "运行时长", 
          "构建历史", "刷新状态", "自动刷新已启用", "暂无构建记录", "English",
          "运行中", "已停止", "构建中", "成功", "失败", "等待中")
     } else {
-        ("Pumpkin Monitor", "Automated Deployment Monitoring System", "Running Status", "Build Status", "Current Commit", "Uptime",
+        ("Pumpkin Monitor", "Automated Deployment Monitoring System", "Test Pumpkin Minecraft Server Hosted by zly2006 - Connect to: slv4.starlight.cool:3082", "Running Status", "Build Status", "Current Commit", "Uptime",
          "Build History", "Refresh Status", "Auto refresh enabled", "No build records", "中文",
          "Running", "Stopped", "Building", "Success", "Failed", "Pending")
     };
@@ -248,6 +244,24 @@ fn create_html_page(
         .header p {{
             font-size: 1.2rem;
             opacity: 0.9;
+        }}
+
+        .server-info {{
+            font-size: 1.1rem;
+            margin-top: 15px;
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 25px;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: inline-block;
+            backdrop-filter: blur(10px);
+        }}
+
+        .server-address {{
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-weight: bold;
+            color: #fff3cd;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
         }}
 
         .lang-switch {{
@@ -460,6 +474,9 @@ fn create_html_page(
             <a href="/?lang={}" class="lang-switch">{}</a>
             <h1>🎃 {}</h1>
             <p>{}</p>
+            <div class="server-info">
+                🎮 <span class="server-address">{}</span>
+            </div>
         </div>
 
         <div class="status-card">
@@ -590,9 +607,10 @@ fn create_html_page(
             
             // Update uptime
             if (status.uptime) {{
-                const days = Math.floor(status.uptime.secs / 86400);
-                const hours = Math.floor((status.uptime.secs % 86400) / 3600);
-                const minutes = Math.floor((status.uptime.secs % 3600) / 60);
+                const secs = new Date(status.uptime).getTime() / 1000;
+                const days = Math.floor(secs / 86400);
+                const hours = Math.floor((secs % 86400) / 3600);
+                const minutes = Math.floor((secs % 3600) / 60);
                 uptime.textContent = `${{days}}d ${{hours}}h ${{minutes}}m`;
             }} else {{
                 uptime.textContent = 'Unknown';
@@ -646,7 +664,7 @@ fn create_html_page(
     </script>
 </body>
 </html>"#,
-        lang_attr, title, other_lang, lang_switch_text, title, subtitle,
+        lang_attr, title, other_lang, lang_switch_text, title, subtitle, server_info,
         running_status_label, running_class, running_status_text,
         build_status_label, build_class, build_status_text,
         current_commit_label, current_commit,

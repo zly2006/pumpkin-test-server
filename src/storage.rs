@@ -99,7 +99,11 @@ impl Storage {
     }
 
     pub fn get_system_status(&self) -> SystemStatus {
-        self.data.system_status.clone()
+        let mut status = self.data.system_status.clone();
+        status.uptime = status.started_at
+            .map(|started_at| chrono::Utc::now() - started_at)
+            .or_else(|| status.uptime);
+        status
     }
 
     pub async fn set_service_started(&mut self) -> Result<()> {
