@@ -1,0 +1,8 @@
+/target/
+/workspace/
+data.json
+*.log
+.env
+*.db
+*.db-wal
+*.db-shm

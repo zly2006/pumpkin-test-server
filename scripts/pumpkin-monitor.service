@@ -1,0 +1,27 @@
+# systemd service file for Pumpkin Monitor
+# Copy to /etc/systemd/system/pumpkin-monitor.service
+
+[Unit]
+Description=Pumpkin Monitor - Auto deployment system
+After=network.target
+
+[Service]
+Type=simple
+User=pumpkin
+Group=pumpkin
+WorkingDirectory=/opt/pumpkin-monitor
+ExecStart=/opt/pumpkin-monitor/target/release/pumpkin-monitor
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pumpkin-monitor
+
+[Install]
+WantedBy=multi-user.target

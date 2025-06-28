@@ -1,0 +1,21 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+
+[github]
+repo_owner = "Pumpkin-MC"
+repo_name = "Pumpkin"
+branch = "master"
+check_interval = 300
+
+[build]
+workspace_dir = "./workspace"
+binary_name = "pumpkin"
+build_timeout = 1800
+
+[runtime]
+restart_delay = 5
+max_retries = 3
+
+[storage]
+data_file = "./data.json"
