@@ -290,10 +290,12 @@ impl BuildManager {
         info!("Working directory: {:?}", self.workspace_path);
 
         // 在workspace目录中运行二进制文件
+        // 让子进程继承父进程的stdio，避免终端状态问题
         let child = Command::new(&binary_path.canonicalize().unwrap())
             .current_dir(&self.workspace_path.canonicalize().unwrap())  // 设置工作目录为workspace
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stdin(Stdio::null())   // 禁用stdin
+            .stdout(Stdio::null()) // 继承stdout，避免管道阻塞
+            .stderr(Stdio::null()) // 继承stderr，避免管道阻塞
             .spawn()?;
 
         let pid = child.id();

@@ -68,10 +68,14 @@ async fn index(
     Query(params): Query<IndexQuery>,
 ) -> Result<Html<String>, (StatusCode, String)> {
     let storage = state.storage.read().await;
-    let status = storage.get_system_status();
+    let mut status = storage.get_system_status();
     let builds = storage.get_latest_builds(10);
     
     let lang = params.lang.as_deref().unwrap_or("zh");
+    status.uptime = status.started_at
+        .map(|started_at| chrono::Utc::now() - started_at)
+        .or_else(|| status.uptime);
+    println!("Current system status: {:?}", status);
     let html = create_html_page(&status, &builds, lang);
     Ok(Html(html))
 }
