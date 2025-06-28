@@ -23,6 +23,7 @@ impl Default for StorageData {
                 last_check: chrono::Utc::now(),
                 uptime: None,
                 started_at: None,
+                process_pid: None,
             },
         }
     }
@@ -103,6 +104,7 @@ impl Storage {
 
     pub async fn set_service_started(&mut self) -> Result<()> {
         self.data.system_status.is_running = true;
+        self.data.system_status.build_status = BuildStatusType::Success;
         self.data.system_status.started_at = Some(chrono::Utc::now());
         self.save().await?;
         Ok(())

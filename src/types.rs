@@ -84,4 +84,5 @@ pub struct SystemStatus {
     pub last_check: chrono::DateTime<chrono::Utc>,
     pub uptime: Option<chrono::Duration>,
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub process_pid: Option<u32>,
 }

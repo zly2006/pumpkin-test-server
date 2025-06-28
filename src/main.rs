@@ -54,6 +54,9 @@ async fn main() -> Result<()> {
     let storage = Arc::new(RwLock::new(Storage::new(workspace_data_file.to_string_lossy().to_string()).await?));
     info!("Storage initialized in workspace: {:?}", workspace_data_file);
 
+    // 检查并清理可能存在的旧进程
+    build_manager.prepare_for_start(&storage).await?;
+
     // 启动 Web 服务器
     let web_server = WebServer::new(storage.clone())?;
     let addr = format!("{}:{}", config.server.host, config.server.port);
@@ -209,7 +212,7 @@ async fn monitor_iteration(
         }
 
         // 重启服务
-        let build_result = build_manager.restart_service(&commit).await?;
+        let (build_result, new_pid) = build_manager.restart_service(&commit).await?;
         
         // 保存构建状态
         {
@@ -222,6 +225,9 @@ async fn monitor_iteration(
                 info!("Service restarted successfully for commit: {}", commit.sha);
                 
                 new_status.build_status = BuildStatusType::Success;
+                if let Some(pid) = new_pid {
+                    new_status.process_pid = Some(pid);
+                }
                 let mut storage_guard = storage.write().await;
                 storage_guard.update_system_status(new_status).await?;
                 storage_guard.set_service_started().await?;
@@ -230,6 +236,7 @@ async fn monitor_iteration(
                 error!("Failed to restart service: {:?}", build_result.error_message);
                 
                 new_status.build_status = BuildStatusType::Failed;
+                new_status.process_pid = None;
                 let mut storage_guard = storage.write().await;
                 storage_guard.update_system_status(new_status).await?;
                 storage_guard.set_service_stopped().await?;
@@ -256,6 +263,9 @@ async fn status_monitor_iteration(
     if current_status.is_running != is_running {
         let mut new_status = current_status.clone();
         new_status.is_running = is_running;
+        if is_running {
+            new_status.build_status = BuildStatusType::Success;
+        }
         new_status.last_check = chrono::Utc::now();
         
         if is_running {
@@ -269,6 +279,10 @@ async fn status_monitor_iteration(
         
         if !is_running {
             storage_guard.set_service_stopped().await?;
+            // 清除PID信息
+            let mut updated_status = new_status.clone();
+            updated_status.process_pid = None;
+            storage_guard.update_system_status(updated_status).await?;
         } else {
             storage_guard.set_service_started().await?;
         }
@@ -282,12 +296,20 @@ async fn status_monitor_iteration(
         if repo_cloned && binary_built {
             info!("Attempting to restart service with existing binary");
             
-            if let Err(e) = build_manager.start_new_process() {
-                warn!("Failed to restart service: {}", e);
-            } else {
-                info!("Service restarted successfully");
-                let mut storage_guard = storage.write().await;
-                storage_guard.set_service_started().await?;
+            match build_manager.start_new_process() {
+                Ok(pid) => {
+                    info!("Service restarted successfully with PID: {}", pid);
+                    let mut new_status = current_status.clone();
+                    new_status.process_pid = Some(pid);
+                    new_status.is_running = true;
+                    
+                    let mut storage_guard = storage.write().await;
+                    storage_guard.update_system_status(new_status).await?;
+                    storage_guard.set_service_started().await?;
+                }
+                Err(e) => {
+                    warn!("Failed to restart service: {}", e);
+                }
             }
         } else {
             // 如果没有仓库或二进制文件，记录但不尝试启动
